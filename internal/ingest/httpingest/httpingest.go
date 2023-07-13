@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/cloudevents/sdk-go/v2/event"
@@ -58,11 +59,27 @@ func (h Handler) processBatchRequest(w http.ResponseWriter, r *http.Request) err
 		return err
 	}
 
+	errChan := make(chan error, len(events))
+	var wg sync.WaitGroup
+	wg.Add(len(events))
+
 	for _, event := range events {
-		err = h.processEvent(r.Context(), event)
-		if err != nil {
-			return err
-		}
+		go func(event api.Event) {
+			defer wg.Done()
+			errChan <- h.processEvent(r.Context(), event)
+		}(event)
+	}
+
+	wg.Wait()
+	close(errChan)
+
+	var errs []error
+	for err := range errChan {
+		errs = append(errs, err)
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 
 	return nil

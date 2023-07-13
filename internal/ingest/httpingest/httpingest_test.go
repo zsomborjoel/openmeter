@@ -96,13 +96,33 @@ func TestBatchHandler(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	require.Len(t, collector.events, 10)
-
 	lastRecivedEvent := collector.events[len(collector.events)-1]
 	comperableEvent := collector.events[len(collector.events)-2]
-
-	assert.Equal(t, "id10", lastRecivedEvent.ID())
-	assert.Equal(t, "sub10", lastRecivedEvent.Subject())
-	assert.Equal(t, "test10", lastRecivedEvent.Source())
 	assert.NotEqual(t, comperableEvent.Time(), lastRecivedEvent.Time())
+
+	assert.True(t, slicesAreEqual(events, collector.events))
+}
+
+func slicesAreEqual(slice1, slice2 []event.Event) bool {
+	if len(slice1) != len(slice2) {
+		return false
+	}
+
+	counts := make(map[string]int)
+
+	for _, element := range slice1 {
+		counts[element.ID()]++
+	}
+
+	for _, element := range slice2 {
+		counts[element.ID()]--
+	}
+
+	for _, count := range counts {
+		if count != 0 {
+			return false
+		}
+	}
+
+	return true
 }
